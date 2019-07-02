@@ -280,6 +280,58 @@ cv_bridge::CvImagePtr cv_disp_ptr (new cv_bridge::CvImage);
 cv::Mat depth_mat;
 cv::Mat depth_mat_8;
 cv::Mat_<cv::Vec3b> disparity_color_;
+cv_bridge::CvImagePtr cv_left_ptr (new cv_bridge::CvImage);
+cv_bridge::CvImagePtr cv_right_ptr (new cv_bridge::CvImage);
+
+void leftImageCallback(const sensor_msgs::ImageConstPtr msg) {
+
+    try {
+        cv_left_ptr = cv_bridge::toCvCopy(msg, "bgr8");
+        cv::waitKey(30);
+    }
+    catch (cv_bridge::Exception& e) {
+
+        ROS_ERROR("Could not convert from '%s' to 'bgr8'.", msg->encoding.c_str());
+
+    }
+}
+
+void rightImageCallback(const sensor_msgs::ImageConstPtr msg) {
+
+    try {
+        cv_right_ptr = cv_bridge::toCvCopy(msg, "bgr8");
+        cv::waitKey(30);
+    }
+    catch (cv_bridge::Exception& e) {
+
+        ROS_ERROR("Could not convert from '%s' to 'bgr8'.", msg->encoding.c_str());
+
+    }
+}
+
+void disparityCallback(const stereo_msgs::DisparityImageConstPtr& disp) {
+    float min_disparity = disp->min_disparity;
+    float max_disparity = disp->max_disparity;
+    float multiplier = 255.0f / (max_disparity - min_disparity);
+    assert(disp->image.encoding == sensor_msgs::image_encodings::TYPE_32FC1);
+    const cv::Mat_<float> dmat(disp->image.height, disp->image.width,
+                               (float*)&disp->image.data[0], disp->image.step);
+    disparity_color_.create(disp->image.height, disp->image.width);
+
+    for (int row = 0; row < disparity_color_.rows; ++row) {
+        const float* d = dmat[row];
+        for (int col = 0; col < disparity_color_.cols; ++col) {
+            int index = (d[col] - min_disparity) * multiplier + 0.5;
+            index = std::min(255, std::max(0, index));
+            // Fill as BGR
+            disparity_color_(row, col)[2] = colormap[3*index + 0];
+            disparity_color_(row, col)[1] = colormap[3*index + 1];
+            disparity_color_(row, col)[0] = colormap[3*index + 2];
+        }
+    }
+    imshow( "view", disparity_color_ );
+}
+
 
 
 #endif //TENSOR_DVRK_COLOR_DISPARITY_STREAMER_H
