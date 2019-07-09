@@ -1,78 +1,63 @@
 #!/usr/bin/env python
 import rospy
 import cv2
-import roslib
 import numpy as np
-from std_msgs.msg import String
-from std_msgs.msg import Float32
+
 from sensor_msgs.msg import Image
-from cv_bridge import CvBridge, CvBridgeError
+from cv_bridge import CvBridge
 import matplotlib.pyplot as plt
-
-import tensorflow as tf
-from keras.preprocessing import image
+import flapnet
 from tensorflow.python.keras import models
-from tensorflow.python.keras import losses
 
-rospy.init_node('camera_flap_detection', anonymous=True)
-pred_pub = rospy.Publisher('object_detected_probability', Image, queue_size=1)
-target_size = (64, 64)
-crop = ((56, 521), (160, 665))
-
+# Manual settings
 bridge = CvBridge()
+orig_size = (720, 576)
+depth_orig = (506,466)
+target_size = (64, 64)
+crop = ((55, 521), (159, 665))
 
-plt.figure()
+# Create Flapnet objects
+fn_struct = flapnet.Structure()
+fn_losses = flapnet.LossFunction()
+fn_preproc = flapnet.Preprocessing()
+fn = flapnet.Functions(shape_img=(64, 64, 3))
+
+
 def callback(image_msg):
-    # First convert the image to OpenCV image
+    # declare global variable
+    global cam_disp
     global cv_image
-    global np_image
+
+    # convert image to a compatible format
     cv_image = bridge.imgmsg_to_cv2(image_msg, desired_encoding='rgb8')
     cv_image = cv_image[crop[0][0]:crop[0][1], crop[1][0]:crop[1][1]]
-    cv_image = cv2.resize(cv_image, target_size)  # resize image
-    # cv2.imshow("cazzoculo", cv_image)
-    np_image = np.expand_dims(cv_image, axis=0)
+    cam_disp = fn_preproc.image_preproc(cv_image, target_size)
+    # cv2.imshow("Input Depthmap", cv_image)
+    # cv2.waitKey(3)
 
 
-def dice_coeff(y_true, y_pred):
-    smooth = 1.
-    # Flatten
-    y_true_f = tf.reshape(y_true, [-1])
-    y_pred_f = tf.reshape(y_pred, [-1])
-    intersection = tf.reduce_sum(y_true_f * y_pred_f)
-    score = (2. * intersection + smooth) / (tf.reduce_sum(y_true_f) + tf.reduce_sum(y_pred_f) + smooth)
-    return score
+# ROS init
+rospy.init_node('camera_flap_detection', anonymous=True)
+pred_pub = rospy.Publisher('nn/prediction/mask', Image, queue_size=1)
+disp_sub = rospy.Subscriber("/stereo/disparity/image", Image, callback, queue_size=1, buff_size=100000)
+rate = rospy.Rate(10)
 
-
-def dice_loss(y_true, y_pred):
-    loss = 1 - dice_coeff(y_true, y_pred)
-    return loss
-
-
-def bce_dice_loss(y_true, y_pred):
-    loss = losses.binary_crossentropy(y_true, y_pred) + dice_loss(y_true, y_pred)
-    return loss
-
-
-rospy.Subscriber("/stereo/disparity/image", Image, callback, queue_size=1, buff_size=16777216)
-
-model = models.load_model('/home/aleks/nn_results/nn_ftw.hdf5', custom_objects={'bce_dice_loss': bce_dice_loss,
-                                                                                'dice_loss': dice_loss})
-model.summary()
-
+# Load model from file
+model_path = '/home/aleks/nn_results/nn_ftw.hdf5'
+model = models.load_model(model_path, custom_objects={'bce_dice_loss': fn_losses.bce_dice_loss,
+                                                           'dice_loss': fn_losses.dice_loss})
+print('Neural Network model loaded from file: {}'.format(model_path))
 
 while not rospy.is_shutdown():
 
-    plt.figure()
-    plt.imshow(cv_image)
-    plt.show()
+    pred = model.predict(cam_disp)[0]
+    pred_res = cv2.resize(pred, depth_orig, interpolation=cv2.INTER_CUBIC)
+    canvas_depth = np.zeros((576,720), np.float32)
+    canvas_depth[55:521, 159:665] = pred_res
 
-    prediction = model.predict(np_image)
-    pred_reshape = np.squeeze(prediction, axis=0)
-    pred_reshape_square = np.squeeze(np.squeeze(prediction, axis=0))
 
-    plt.figure()
-    plt.imshow(pred_reshape_square)
-    plt.show()
 
-    print('loop')
-    rospy.spin()
+    cv2.imshow("Flap detection", canvas_depth)
+    cv2.waitKey(3)
+
+    rate.sleep()
