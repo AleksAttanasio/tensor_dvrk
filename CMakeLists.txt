@@ -16,6 +16,7 @@ set(OpenCV_INCLUDE_DIR ${OPENCV_INCLUDE_DIR})
 
 catkin_package()
 
+catkin_python_setup()
 
 include_directories(
         include
