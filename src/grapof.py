@@ -49,28 +49,30 @@ class ImageProcessing:
     def find_first_border_point(self, img, line):
         if img[line[0][1],line[0][0]] == 0:
             for i in range(len(line)):
-                if img[line[i][0],line[i][1]] > 50:
-                    return line[i]
+                if img[line[i][1],line[i][0]] > 204:
+                    return (line[i][0], line[i][1])
         else:
             for i in reversed(range(len(line))):
-                if img[line[i][1],line[i][0]] > 50:
-                    return line[i]
+                if img[line[i][1],line[i][0]] > 204:
+                    return (line[i][0], line[i][1])
                 
     # Find a a single centroid in region
     def find_single_centroid(self, img):
         M = cv2.moments(img)
-        cX = int(M["m10"] / M["m00"])
-        cY = int(M["m01"] / M["m00"])
-        return cX, cY
+        if M['m00'] != 0:
+            cX = int(M["m10"] / M["m00"])
+            cY = int(M["m01"] / M["m00"])
+            return cX, cY
     
     # Detects multiple centroids in the image and return them into an array
     def find_multiple_centroids(self, img):
         centres = []
-        _, contours, _= cv2.findContours(img, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        _, contours, hier = cv2.findContours(img, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
         for i in range(len(contours)):
           moments = cv2.moments(contours[i])
-          centres.append((int(moments['m10']/moments['m00']), int(moments['m01']/moments['m00'])))
+          if moments['m00'] != 0:
+            centres.append((int(moments['m10']/moments['m00']), int(moments['m01']/moments['m00'])))
           
         return centres
     
@@ -79,14 +81,14 @@ class ImageProcessing:
         gp = []
         for i in range(len(centres)):
             line = self.bresenham_line(centres[i][0], centres[i][1], cX, cY)
-            gp.append(self.find_first_border_point(I_bin, line))
+            if self.find_first_border_point(I_bin,line) != None:
+                gp.append(self.find_first_border_point(I_bin, line))
         return gp
 
     
     # Prints centroids of cordinates <centres> on image I
     def print_tissue_centroids(self, I, centres):
         multi_cent = I
-        
         for i in range(len(centres)):
             multi_cent = cv2.circle(multi_cent, (centres[i][0], centres[i][1]), 2, (200, 150, 90), 5)
         
