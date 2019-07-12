@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import rospy
 import cv2
+import grapof
 import numpy as np
 
 from sensor_msgs.msg import Image
@@ -20,6 +21,8 @@ crop = ((55, 521), (159, 665))
 fn_struct = flapnet.Structure()
 fn_losses = flapnet.LossFunction()
 fn_preproc = flapnet.Preprocessing()
+fn_post = flapnet.Postprocessing()
+img_proc = grapof.ImageProcessing()
 fn = flapnet.Functions(shape_img=(64, 64, 3))
 
 
@@ -51,11 +54,28 @@ print('Neural Network model loaded from file: {}'.format(model_path))
 while not rospy.is_shutdown():
 
     pred = model.predict(cam_disp)[0]
-    pred_res = cv2.resize(pred, depth_orig, interpolation=cv2.INTER_CUBIC)
-    canvas_depth = np.zeros((576,720), np.float32)
-    canvas_depth[55:521, 159:665] = pred_res
+    pred_color = cv2.cvtColor(pred, cv2.COLOR_GRAY2BGR)
 
+    # pred_grey = cv2.cvtColor(pred, cv2.COLOR_BGR2GRAY)
+    #
+    # pred_res = cv2.resize(pred, depth_orig, interpolation=cv2.INTER_BITS2)
+    # retval, pred_bin = cv2.threshold(pred_res, 0.8, 1, cv2.THRESH_BINARY)
+    # pred_8 = pred_bin.astype('uint8') * 255
+    # pred_inv = cv2.bitwise_not(pred_8)
+    #
+    # centres = img_proc.find_multiple_centroids(pred_8)
+    #
+    # # Evaluate momentum for background centroid detection
+    # cX, cY = img_proc.find_single_centroid(pred_inv)
+    #
+    # # Detect optimal grasping points and store them in gp[]
+    # gp = img_proc.find_grasping_points(pred_bin, centres, cX, cY)
+    #
+    # out_img = img_proc.print_background_centroid(pred_color, cX, cY)
+    # out_img = img_proc.print_tissue_centroids(out_img, centres)
+    # out_img = img_proc.print_grasping_points(out_img, gp)
 
+    canvas_depth = fn_post.make_canvas_fit(pred)
 
     cv2.imshow("Flap detection", canvas_depth)
     cv2.waitKey(3)

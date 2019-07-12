@@ -425,3 +425,9 @@ class Preprocessing:
         np_image = np.expand_dims(np_image, axis=0)  # Add another dimension for tensorflow
         test_img = np.float32(np_image) / 255
         return test_img
+
+class Postprocessing:
+    def make_canvas_fit(self, pred):
+        canvas_depth = np.zeros((576, 720), np.float32)
+        canvas_depth[55:521, 159:665] = pred
+        return canvas_depth
