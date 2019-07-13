@@ -85,7 +85,17 @@ class ImageProcessing:
                 gp.append(self.find_first_border_point(I_bin, line))
         return gp
 
-    
+    # Clean binary disparity map
+    def clean_disparity_map(self, I_bin, size_th=2000):
+        nb_components, output, stats, centroids = cv2.connectedComponentsWithStats(I_bin, connectivity=8)
+        sizes = stats[1:, -1]; nb_components = nb_components - 1
+        clean_img = np.zeros((output.shape))
+        #for every component in the image, you keep it only if it's above min_size
+        for i in range(0, nb_components):
+            if sizes[i] >= size_th:
+                clean_img[output == i + 1] = 255
+        return clean_img
+
     # Prints centroids of cordinates <centres> on image I
     def print_tissue_centroids(self, I, centres):
         multi_cent = I
