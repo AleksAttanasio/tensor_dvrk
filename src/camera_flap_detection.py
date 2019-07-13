@@ -5,6 +5,7 @@ import grapof
 import numpy as np
 
 from sensor_msgs.msg import Image
+from stereo_msgs.msg import DisparityImage
 from cv_bridge import CvBridge
 import matplotlib.pyplot as plt
 import flapnet
@@ -56,34 +57,28 @@ while not rospy.is_shutdown():
     pred = model.predict(cam_disp)[0]
     pred_color = cv2.cvtColor(pred, cv2.COLOR_GRAY2BGR)
 
-    # pred_grey = cv2.cvtColor(pred, cv2.COLOR_BGR2GRAY)
-
     pred_res = cv2.resize(pred, depth_orig, interpolation=cv2.INTER_BITS2)
     retval, pred_bin = cv2.threshold(pred_res, 0.5, 1, cv2.THRESH_BINARY)
-    pred_bin_3 = cv2.cvtColor(pred_bin, cv2.COLOR_GRAY2BGR)
-    pred_8 = pred_bin.astype('uint8') * 255
-    pred_inv = cv2.bitwise_not(pred_8)
+    pred_bin_clean = img_proc.clean_disparity_map(pred_bin.astype('uint8'), size_th=5000)
 
-    pred_8 = img_proc.clean_disparity_map(pred_8)
-    pred_8 = pred_bin.astype('uint8') * 255
+    pred_bin_color = cv2.cvtColor(pred_bin_clean.astype('uint8'), cv2.COLOR_GRAY2BGR)
+    pred_inv = cv2.bitwise_not(pred_bin_clean.astype('uint8'))
 
-    centres = img_proc.find_multiple_centroids(pred_8)
+    centres = img_proc.find_multiple_centroids(pred_bin_clean.astype('uint8'))
     print('Found {} tissues'.format(len(centres)))
     # Evaluate momentum for background centroid detection
     cX, cY = img_proc.find_single_centroid(pred_inv)
 
     # Detect optimal grasping points and store them in gp[]
-    gp = img_proc.find_grasping_points(pred_8, centres, cX, cY)
+    gp = img_proc.find_grasping_points(pred_bin_clean.astype('uint8'), centres, cX, cY)
     print('Found {} grasping points'.format(len(gp)))
-    out_img = img_proc.print_background_centroid(pred_bin_3, cX, cY)
+    out_img = img_proc.print_background_centroid(pred_bin_color, cX, cY)
 
     for i in range(len(gp)):
         out_img = cv2.circle(out_img, (gp[i][0], gp[i][1]), 2, (0, 255, 0), 5)
 
     out_img = img_proc.print_tissue_centroids(out_img, centres)
-    # out_img = img_proc.print_grasping_points(out_img, gp)
-
-    # canvas_depth = fn_post.make_canvas_fit(out_img)
+    baseline = 0.05
 
     cv2.imshow("Flap detection", out_img)
     cv2.waitKey(3)
