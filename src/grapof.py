@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import cv2
 import numpy as np
+from cv_bridge import CvBridge
 
 
 class ImageProcessing:
@@ -116,3 +117,35 @@ class ImageProcessing:
     def print_background_centroid(self, img, cX, cY):
         disp_centroid = cv2.circle(img, (cX, cY), 2, (0, 0, 255), 5)
         return disp_centroid
+
+
+class Geometry:
+    def __init__(self):
+        return
+
+    # Estimate distance from camera of point
+    def estimate_distance(self, focal_len, baseline, disp):
+        return (focal_len * baseline)/disp
+
+    def project_on_canvas(self, point, offset_x, offset_y):
+        return point[0] + offset_x, point[1] + offset_y
+
+class TopicsSubscription:
+    def __init__(self):
+        self.disp_x_offset = 0
+        self.disp_y_offset = 0
+        self.disp_mat = np.zeros(1)
+        self.foc_len = 0
+        self.baseline = 0
+        self.bridge = CvBridge()
+        self.camera_mat = np.zeros((3, 4), dtype=float)
+
+    def disp_callback(self, disp_msg):
+        self.disp_mat = self.bridge.imgmsg_to_cv2(disp_msg.image)
+        self.foc_len = disp_msg.f
+        self.baseline = disp_msg.T
+        self.disp_x_offset = disp_msg.valid_window.x_offset
+        self.disp_y_offset = disp_msg.valid_window.y_offset
+
+    def caminfo_callback(self, cam_info_msg):
+        self.camera_mat = cam_info_msg.P
