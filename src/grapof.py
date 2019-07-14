@@ -116,10 +116,3 @@ class ImageProcessing:
     def print_background_centroid(self, img, cX, cY):
         disp_centroid = cv2.circle(img, (cX, cY), 2, (0, 0, 255), 5)
         return disp_centroid
-    
-    
-    
-
-    
-
-        
