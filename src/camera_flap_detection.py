@@ -47,7 +47,7 @@ rospy.init_node('camera_flap_detection', anonymous=True)
 disp_sub = rospy.Subscriber("/stereo/disparity/image", Image, callback, queue_size=1, buff_size=100000)
 disp_mat_sub = rospy.Subscriber("/stereo/disparity", DisparityImage, ts.disp_callback, queue_size=1, buff_size=20)
 caminfo = rospy.Subscriber("/stereo/left/camera_info", CameraInfo,ts.caminfo_callback, queue_size=1, buff_size=5)
-gp_3d_pub = rospy.Publisher('/stereo/disparity/graspin_point', PointStamped, queue_size=10)
+gp_3d_pub = rospy.Publisher('/stereo/disparity/grasping_point', PointStamped, queue_size=10)
 
 rate = rospy.Rate(10)
 
@@ -66,7 +66,7 @@ while not rospy.is_shutdown():
     # Resize, binarize and clean the depthmap (all functions wants uint8 images)
     pred_res = cv2.resize(pred, depth_orig, interpolation=cv2.INTER_BITS2)
     retval, pred_bin = cv2.threshold(pred_res, 0.5, 1, cv2.THRESH_BINARY)
-    pred_bin_clean = img_proc.clean_disparity_map(pred_bin.astype('uint8'), size_th=5000)
+    pred_bin_clean = img_proc.clean_disparity_map(pred_bin.astype('uint8'), size_th=7500)
 
     # Convert grey to color image for coloured dots
     pred_bin_color = cv2.cvtColor(pred_bin_clean.astype('uint8'), cv2.COLOR_GRAY2BGR)
@@ -107,8 +107,5 @@ while not rospy.is_shutdown():
         gp_3d.point.z = world_gp_coord[2]
 
         gp_3d_pub.publish(gp_3d)
-
-    # Evaluate 3D traingulation for 2D point
-    # print("Distance of point({},{}): {} m".format(bg_pj[0], bg_pj[1], Z))
 
     rate.sleep()
