@@ -7,6 +7,7 @@ from tensorflow.python.keras import models
 from cv_bridge import CvBridge
 import numpy as np
 from numpy.linalg import inv
+import matplotlib.pyplot as plt
 
 from sensor_msgs.msg import Image
 from stereo_msgs.msg import DisparityImage
@@ -16,9 +17,9 @@ from sensor_msgs.msg import CameraInfo
 # Manual settings
 bridge = CvBridge()
 orig_size = (720, 576)
-depth_orig = (506,466)
+depth_orig = (558, 375)
 target_size = (64, 64)
-crop = ((55, 521), (159, 665))
+crop = ((55, 431), (107, 665))
 
 # Create Flapnet objects
 fn_struct = flapnet.Structure()
@@ -37,22 +38,22 @@ def callback(image_msg):
     global cv_image
 
     # convert image to a compatible format
-    cv_image = bridge.imgmsg_to_cv2(image_msg, desired_encoding='rgb8')
+    cv_image = bridge.imgmsg_to_cv2(image_msg, desired_encoding='bgr8')
     cv_image = cv_image[crop[0][0]:crop[0][1], crop[1][0]:crop[1][1]]
     cam_disp = fn_preproc.image_preproc(cv_image, target_size)
 
-
 # ROS init
 rospy.init_node('camera_flap_detection', anonymous=True)
-disp_sub = rospy.Subscriber("/stereo/disparity/image", Image, callback, queue_size=1, buff_size=100000)
-disp_mat_sub = rospy.Subscriber("/stereo/disparity", DisparityImage, ts.disp_callback, queue_size=1, buff_size=20)
-caminfo = rospy.Subscriber("/stereo/left/camera_info", CameraInfo,ts.caminfo_callback, queue_size=1, buff_size=5)
-gp_3d_pub = rospy.Publisher('/stereo/disparity/grasping_point', PointStamped, queue_size=10)
+disp_sub = rospy.Subscriber("/endoscope/disparity/image", Image, callback, queue_size=1, buff_size=100000)
+disp_mat_sub = rospy.Subscriber("/endoscope/disparity", DisparityImage, ts.disp_callback, queue_size=1, buff_size=20)
+caminfo = rospy.Subscriber("/endoscope/left/camera_info", CameraInfo,ts.caminfo_callback, queue_size=1, buff_size=5)
+gp_3d_pub = rospy.Publisher('/endoscope/disparity/grasping_point', PointStamped, queue_size=10)
+tp_3d_pub = rospy.Publisher('/endoscope/disparity/tissue_point', PointStamped, queue_size=10)
 
 rate = rospy.Rate(10)
 
 # Load model from file
-model_path = '/home/aleks/nn_results/nn_ftw.hdf5'
+model_path = '/home/stormlab/nn_results/nn_ftw/model_ftw.hdf5'
 model = models.load_model(model_path, custom_objects={'bce_dice_loss': fn_losses.bce_dice_loss,
                                                            'dice_loss': fn_losses.dice_loss})
 print('Neural Network model loaded from file: {}'.format(model_path))
@@ -64,7 +65,7 @@ while not rospy.is_shutdown():
     pred_color = cv2.cvtColor(pred, cv2.COLOR_GRAY2BGR)
 
     # Resize, binarize and clean the depthmap (all functions wants uint8 images)
-    pred_res = cv2.resize(pred, depth_orig, interpolation=cv2.INTER_BITS2)
+    pred_res = cv2.resize(pred, depth_orig, interpolation=cv2.INTER_LINEAR)
     retval, pred_bin = cv2.threshold(pred_res, 0.5, 1, cv2.THRESH_BINARY)
     pred_bin_clean = img_proc.clean_disparity_map(pred_bin.astype('uint8'), size_th=7500)
 
@@ -107,5 +108,21 @@ while not rospy.is_shutdown():
         gp_3d.point.z = world_gp_coord[2]
 
         gp_3d_pub.publish(gp_3d)
+
+    if len(centres) != 0:
+        tp_pj = geo.project_on_canvas(point=(centres[0][0], centres[0][1]), offset_x=ts.disp_x_offset,
+                                      offset_y=ts.disp_y_offset)
+        disp = ts.disp_mat[tp_pj[1], tp_pj[0]]
+        tp_Z = geo.estimate_distance(ts.foc_len, ts.baseline, disp)
+        img_tp_coord = (tp_pj[1], tp_pj[0], 1)
+        cam_mat = np.asarray(ts.camera_mat).reshape((3, 4))
+        world_tp_coord = (np.matmul(inv(cam_mat[:, 0:3]), img_tp_coord)) * tp_Z
+
+        tp_3d = PointStamped()
+        tp_3d.point.x = world_tp_coord[0]
+        tp_3d.point.y = world_tp_coord[1]
+        tp_3d.point.z = world_tp_coord[2]
+
+        tp_3d_pub.publish(tp_3d)
 
     rate.sleep()

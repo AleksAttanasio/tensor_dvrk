@@ -11,8 +11,8 @@ find_package(
         image_transport
 )
 
-include(/opt/opencv-3.4.3/build/OpenCVConfig.cmake)
-set(OpenCV_INCLUDE_DIR ${OPENCV_INCLUDE_DIR})
+#include(/opt/opencv-3.4.3/build/OpenCVConfig.cmake)
+#set(OpenCV_INCLUDE_DIR ${OPENCV_INCLUDE_DIR})
 
 catkin_package()
 

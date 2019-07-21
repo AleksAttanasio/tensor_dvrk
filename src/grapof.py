@@ -2,6 +2,7 @@
 import cv2
 import numpy as np
 from cv_bridge import CvBridge
+import flapnet
 
 
 class ImageProcessing:
@@ -68,7 +69,7 @@ class ImageProcessing:
     # Detects multiple centroids in the image and return them into an array
     def find_multiple_centroids(self, img):
         centres = []
-        _, contours, hier = cv2.findContours(img, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        contours, hier = cv2.findContours(img, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
         for i in range(len(contours)):
           moments = cv2.moments(contours[i])
@@ -131,14 +132,18 @@ class Geometry:
         return point[0] + offset_x, point[1] + offset_y
 
 class TopicsSubscription:
-    def __init__(self):
+    def __init__(self, nn_target_size=(64,64), crop_window=((55, 521), (159, 665))):
         self.disp_x_offset = 0
         self.disp_y_offset = 0
         self.disp_mat = np.zeros(1)
         self.foc_len = 0
         self.baseline = 0
         self.bridge = CvBridge()
+        self.fn_preproc = flapnet.Preprocessing()
         self.camera_mat = np.zeros((3, 4), dtype=float)
+        self.cam_disp = np.zeros(1)
+        self.target_size = nn_target_size
+        self.crop_win = crop_window
 
     def disp_callback(self, disp_msg):
         self.disp_mat = self.bridge.imgmsg_to_cv2(disp_msg.image)
@@ -149,3 +154,9 @@ class TopicsSubscription:
 
     def caminfo_callback(self, cam_info_msg):
         self.camera_mat = cam_info_msg.P
+
+    def img_callback(self, image_msg):
+        # convert image to a compatible format
+        cv_image = self.bridge.imgmsg_to_cv2(image_msg, desired_encoding='rgb8')
+        cv_image = cv_image[self.crop_win[0][0]:self.crop_win[0][1], self.crop_win[1][0]:self.crop_win[1][1]]
+        self.cam_disp = self.fn_preproc.image_preproc(cv_image, self.target_size)
