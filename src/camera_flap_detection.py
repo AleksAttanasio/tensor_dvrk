@@ -96,11 +96,7 @@ while not rospy.is_shutdown():
     # Project grasping point on depth map canvas
     if len(gp) != 0:
         gp_pj = geo.project_on_canvas(point=(gp[0][0], gp[0][1]), offset_x=ts.disp_x_offset, offset_y=ts.disp_y_offset)
-        disp = ts.disp_mat[gp_pj[1], gp_pj[0]]
-        gp_Z = geo.estimate_distance(ts.foc_len, ts.baseline, disp)
-        img_gp_coord = (gp_pj[1], gp_pj[0], 1)
-        cam_mat = np.asarray(ts.camera_mat).reshape((3,4))
-        world_gp_coord = (np.matmul(inv(cam_mat[:, 0:3]), img_gp_coord)) * gp_Z
+        world_gp_coord = geo.pix2word(ts.disp_mat, ts.camera_mat, ts.foc_len, ts.baseline, gp_pj)
 
         gp_3d = PointStamped()
         gp_3d.point.x = world_gp_coord[0]
@@ -112,11 +108,7 @@ while not rospy.is_shutdown():
     if len(centres) != 0:
         tp_pj = geo.project_on_canvas(point=(centres[0][0], centres[0][1]), offset_x=ts.disp_x_offset,
                                       offset_y=ts.disp_y_offset)
-        disp = ts.disp_mat[tp_pj[1], tp_pj[0]]
-        tp_Z = geo.estimate_distance(ts.foc_len, ts.baseline, disp)
-        img_tp_coord = (tp_pj[1], tp_pj[0], 1)
-        cam_mat = np.asarray(ts.camera_mat).reshape((3, 4))
-        world_tp_coord = (np.matmul(inv(cam_mat[:, 0:3]), img_tp_coord)) * tp_Z
+        world_tp_coord = geo.pix2word(ts.disp_mat, ts.camera_mat, ts.foc_len, ts.baseline, tp_pj)
 
         tp_3d = PointStamped()
         tp_3d.point.x = world_tp_coord[0]

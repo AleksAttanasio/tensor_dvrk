@@ -3,6 +3,7 @@ import cv2
 import numpy as np
 from cv_bridge import CvBridge
 import flapnet
+from numpy.linalg import inv
 
 
 class ImageProcessing:
@@ -130,6 +131,15 @@ class Geometry:
 
     def project_on_canvas(self, point, offset_x, offset_y):
         return point[0] + offset_x, point[1] + offset_y
+
+    def pix2word(self, disp_mat, cam_mat, foc_len, baseline, pj_point):
+        disp = disp_mat[pj_point[1], pj_point[0]]
+        gp_Z = self.estimate_distance(foc_len, baseline, disp)
+        img_gp_coord = (pj_point[1], pj_point[0], 1)
+        cam_mat = np.asarray(cam_mat).reshape((3,4))
+        world_gp_coord = (np.matmul(inv(cam_mat[:, 0:3]), img_gp_coord)) * gp_Z
+        return world_gp_coord
+
 
 class TopicsSubscription:
     def __init__(self, nn_target_size=(64,64), crop_window=((55, 521), (159, 665))):
