@@ -49,6 +49,7 @@ disp_mat_sub = rospy.Subscriber("/endoscope/disparity", DisparityImage, ts.disp_
 caminfo = rospy.Subscriber("/endoscope/left/camera_info", CameraInfo,ts.caminfo_callback, queue_size=1, buff_size=5)
 gp_3d_pub = rospy.Publisher('/endoscope/disparity/grasping_point', PointStamped, queue_size=10)
 tp_3d_pub = rospy.Publisher('/endoscope/disparity/tissue_point', PointStamped, queue_size=10)
+bg_3d_pub = rospy.Publisher('/endoscope/disparity/background_point', PointStamped, queue_size=10)
 
 rate = rospy.Rate(10)
 
@@ -116,5 +117,17 @@ while not rospy.is_shutdown():
         tp_3d.point.z = world_tp_coord[2]
 
         tp_3d_pub.publish(tp_3d)
+
+    if cX is not None and cY is not None:
+        bg_pj = geo.project_on_canvas(point=(cX, cY), offset_x=ts.disp_x_offset,
+                                      offset_y=ts.disp_y_offset)
+        world_bg_coord = geo.pix2word(ts.disp_mat, ts.camera_mat, ts.foc_len, ts.baseline, bg_pj)
+
+        bg_3d = PointStamped()
+        bg_3d.point.x = world_bg_coord[0]
+        bg_3d.point.y = world_bg_coord[1]
+        bg_3d.point.z = world_bg_coord[2]
+
+        bg_3d_pub.publish(bg_3d)
 
     rate.sleep()
