@@ -135,9 +135,9 @@ class Geometry:
     def pix2word(self, disp_mat, cam_mat, foc_len, baseline, pj_point):
         disp = disp_mat[pj_point[1], pj_point[0]]
         gp_Z = self.estimate_distance(foc_len, baseline, disp)
-        img_gp_coord = (pj_point[1], pj_point[0], 1)
-        cam_mat = np.asarray(cam_mat).reshape((3,4))
-        world_gp_coord = (np.matmul(inv(cam_mat[:, 0:3]), img_gp_coord)) * gp_Z
+        img_gp_coord = (pj_point[0], pj_point[1], 1)
+        cam_mat = np.asarray(cam_mat).reshape(3,3)
+        world_gp_coord = (np.matmul(inv(cam_mat), img_gp_coord)) * gp_Z
         return world_gp_coord
 
 
@@ -163,7 +163,7 @@ class TopicsSubscription:
         self.disp_y_offset = disp_msg.valid_window.y_offset
 
     def caminfo_callback(self, cam_info_msg):
-        self.camera_mat = cam_info_msg.P
+        self.camera_mat = cam_info_msg.K
 
     def img_callback(self, image_msg):
         # convert image to a compatible format
